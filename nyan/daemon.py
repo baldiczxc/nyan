@@ -35,6 +35,7 @@ class Daemon:
         renderer_config_path: str,
         daemon_config_path: str,
     ) -> None:
+        self.channels_info_path = channels_info_path
         self.client = TelegramClient(client_config_path)
         self.channels = Channels(channels_info_path)
         self.annotator = Annotator(annotator_config_path, self.channels)
@@ -61,6 +62,9 @@ class Daemon:
         mongo_config_path: Optional[str],
         posted_clusters_path: Optional[str],
     ) -> None:
+        self.channels = Channels(self.channels_info_path)
+        self.annotator.channels = self.channels
+        self.renderer.channels = self.channels
         assert (
             input_path and not mongo_config_path or mongo_config_path and not input_path
         )

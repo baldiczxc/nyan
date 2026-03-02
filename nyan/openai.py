@@ -5,6 +5,8 @@ from multiprocessing.pool import ThreadPool
 
 import openai
 import copy
+import os
+import re
 
 
 @dataclass
@@ -30,6 +32,11 @@ def openai_completion(
 ) -> str:
     decoding_args = copy.deepcopy(decoding_args)
     assert decoding_args.n == 1
+
+    if os.environ.get("OPENROUTER_API_KEY"):
+        openai.api_base = "https://openrouter.ai/api/v1"
+        openai.api_key = os.environ.get("OPENROUTER_API_KEY")
+
     while True:
         try:
             completions = openai.ChatCompletion.create(  # type: ignore
@@ -46,7 +53,9 @@ def openai_completion(
                 )
             else:
                 raise e
-    return cast(str, completions.choices[0].message.content.strip())
+    content = cast(str, completions.choices[0].message.content.strip())
+    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+    return content
 
 
 def openai_batch_completion(
