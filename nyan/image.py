@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
 
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity  # type: ignore
 from PIL import Image
 
@@ -15,6 +16,8 @@ class ImageProcessor:
         rm_images_dicts = self.clip_embedder.fetch_images(rm_images_urls)
         rm_images: List[Image.Image] = [i["content"] for i in rm_images_dicts]
         self.rm_embeddings = self.clip_embedder.embed_images(rm_images)
+        if len(self.rm_embeddings) == 0:
+            print("Warning: no rm_images loaded, image filtering disabled")
 
     def __call__(self, images: List[str]) -> List[Dict[str, Any]]:
         fetched_images = self.clip_embedder.fetch_images(images)
@@ -22,6 +25,14 @@ class ImageProcessor:
             return []
         contents: List[Image.Image] = [i["content"] for i in fetched_images]
         image_embeddings = self.clip_embedder.embed_images(contents)
+
+        # If no rm_embeddings loaded, skip filtering and keep all images
+        if len(self.rm_embeddings) == 0:
+            return [
+                {"url": image["url"], "embedding": embedding.tolist()}
+                for image, embedding in zip(fetched_images, image_embeddings)
+            ]
+
         rm_scores = cosine_similarity(image_embeddings, self.rm_embeddings)
         rm_scores = rm_scores.max(axis=1)
         assert len(rm_scores) == len(fetched_images)

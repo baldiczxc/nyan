@@ -13,6 +13,7 @@ from nyan.util import gen_batch
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DEFAULT_CLIP_PATH = "openai/clip-vit-base-patch32"
+FETCH_TIMEOUT = 10
 T = TypeVar("T")
 
 
@@ -21,8 +22,8 @@ class ClipEmbedder:
         self,
         model_name: str = DEFAULT_CLIP_PATH,
         normalize: bool = True,
-        image_batch_size: int = 16,
-        text_batch_size: int = 32,
+        image_batch_size: int = 32,
+        text_batch_size: int = 64,
         device: str = DEVICE,
         enable_tqdm: bool = False,
     ):
@@ -34,21 +35,23 @@ class ClipEmbedder:
         self.normalize = normalize
         self.enable_tqdm = enable_tqdm
 
-    def fetch_images(self, urls: List[str]) -> List[Dict[str, Any]]:
+    def fetch_images(self, urls: List[str], timeout: int = FETCH_TIMEOUT) -> List[Dict[str, Any]]:
         images = []
         for url in urls:
             if not url.startswith("http://") and not url.startswith("https://"):
                 continue
             try:
-                response = requests.get(url, stream=True)
+                response = requests.get(url, stream=True, timeout=timeout)
+                if response.status_code != 200:
+                    continue
+                images.append({"url": url, "content": Image.open(response.raw)})
             except Exception:
                 continue
-            if response.status_code != 200:
-                continue
-            images.append({"url": url, "content": Image.open(response.raw)})
         return images
 
     def embed_images(self, images: List[Image.Image]) -> NDArray[np.float32]:
+        if not images:
+            return np.zeros((0, self.model.projection_dim), dtype=np.float32)
         return self._calc_embeddings(
             func=self._process_images_batch,
             inputs=images,
@@ -57,6 +60,8 @@ class ClipEmbedder:
         )
 
     def embed_texts(self, texts: List[str]) -> NDArray[np.float32]:
+        if not texts:
+            return np.zeros((0, self.model.projection_dim), dtype=np.float32)
         return self._calc_embeddings(
             func=self._process_texts_batch,
             inputs=texts,
@@ -91,11 +96,17 @@ class ClipEmbedder:
             images=images, return_tensors="pt"
         )
         inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
-        return cast(torch.Tensor, self.model.get_image_features(**inputs))
+        output = self.model.get_image_features(**inputs)
+        if isinstance(output, torch.Tensor):
+            return output
+        return output.image_embeds if hasattr(output, "image_embeds") else output[1]
 
     def _process_texts_batch(self, texts: List[str]) -> torch.Tensor:
         inputs: Dict[str, torch.Tensor] = self.processor(
             text=texts, return_tensors="pt", padding=True
         )
         inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
-        return cast(torch.Tensor, self.model.get_text_features(**inputs))
+        output = self.model.get_text_features(**inputs)
+        if isinstance(output, torch.Tensor):
+            return output
+        return output.text_embeds if hasattr(output, "text_embeds") else output[1]

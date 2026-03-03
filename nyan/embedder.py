@@ -14,7 +14,7 @@ class Embedder:
     def __init__(
         self,
         model_name: str,
-        batch_size: int = 64,
+        batch_size: int = 128,
         max_length: int = 128,
         device: str = DEVICE,
         pooling_method: str = "default",

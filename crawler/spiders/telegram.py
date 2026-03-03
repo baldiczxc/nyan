@@ -7,7 +7,7 @@ import html2text
 
 
 def get_current_ts():
-    return int(datetime.now().replace(tzinfo=timezone.utc).timestamp())
+    return int(datetime.now(timezone.utc).timestamp())
 
 
 def process_views(views):
@@ -63,7 +63,7 @@ class TelegramSpider(scrapy.Spider):
 
         assert "hours" in kwargs
         hours = int(kwargs.pop("hours"))
-        self.until_ts = int((datetime.now() - timedelta(hours=hours)).timestamp())
+        self.until_ts = int((datetime.now(timezone.utc) - timedelta(hours=hours)).timestamp())
         print("Considering last {} hours".format(hours))
 
         self.html2text = html2text_setup()
@@ -79,7 +79,9 @@ class TelegramSpider(scrapy.Spider):
             channel_name = url.split("/")[-1]
             last_fetch_time = self.fetch_times.get(channel_name, 0)
             recrawl_time = self.channels[channel_name].get("recrawl_time", 0)
-            assert current_ts >= last_fetch_time
+            if current_ts < last_fetch_time:
+                # Reset future timestamps caused by the previous naive datetime bug
+                last_fetch_time = 0
             if current_ts - last_fetch_time < recrawl_time:
                 print("Skip {}, current ts: {}, last fetch ts: {}, recrawl interval: {}".format(
                     url, current_ts, last_fetch_time, recrawl_time
@@ -153,7 +155,7 @@ class TelegramSpider(scrapy.Spider):
 
         item["text"] = self._parse_html(text_element.extract_first())
         item["links"] = text_element.css("a::attr(href)").getall()
-        item["fetch_time"] = int(datetime.now().replace(tzinfo=timezone.utc).timestamp())
+        item["fetch_time"] = int(datetime.now(timezone.utc).timestamp())
 
         views_element = post_element.css(views_path)
         if not views_element:

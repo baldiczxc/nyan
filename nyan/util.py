@@ -27,7 +27,7 @@ def write_jsonl(file_path: str, records: List[Dict[str, Any]]) -> None:
 
 
 def get_current_ts() -> int:
-    return int(datetime.now().replace(tzinfo=timezone.utc).timestamp())
+    return int(datetime.now(timezone.utc).timestamp())
 
 
 def ts_to_dt(timestamp: int, offset: int = 3) -> datetime:
@@ -61,14 +61,17 @@ class Serializable:
 def set_random_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:2"
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     os.environ["PL_GLOBAL_SEED"] = str(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms(True)
+    try:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+    except TypeError:
+        torch.use_deterministic_algorithms(True)
 
 
 def gen_batch(records: List[Any], batch_size: int) -> Iterable[List[Any]]:
