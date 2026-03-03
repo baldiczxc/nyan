@@ -128,3 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 Чек-лист на 02.03.26.md
+/mongo

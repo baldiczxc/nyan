@@ -2,27 +2,9 @@
     "issues": [
         {
             "name": "main",
-            "channel_id": -1,
+            "channel_id": -1003767266542,
             "discussion_id": -1,
-            "bot_token": "token"
-        },
-        {
-            "name": "tech",
-            "channel_id": -1,
-            "discussion_id": -1,
-            "bot_token": "token"
-        },
-        {
-            "name": "economy",
-            "channel_id": -1,
-            "discussion_id": -1,
-            "bot_token": "token"
-        },
-        {
-            "name": "moscow",
-            "channel_id": -1,
-            "discussion_id": -1,
-            "bot_token": "token"
+            "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         }
     ]
 }

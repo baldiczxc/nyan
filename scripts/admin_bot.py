@@ -3,17 +3,17 @@ import os
 import argparse
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
-    Updater,
+    ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
     ConversationHandler,
     MessageHandler,
-    Filters,
-    CallbackContext,
+    ContextTypes,
+    filters as Filters,
 )
 
 ADMIN_IDS = [int(i) for i in os.environ.get("ADMIN_IDS", "").split(",") if i]
-CHANNELS_PATH = os.environ.get("CHANNELS_PATH", "channels.json")
+CHANNELS_PATH = os.environ.get("CHANNELS_PATH", "/home/vlad/nyan/channels.json")
 
 # Conversation states
 AWAIT_CHANNEL_NAME, AWAIT_GROUP_NAME, AWAIT_ALIAS_NAME = range(3)
@@ -26,7 +26,7 @@ def save_channels(data):
     with open(CHANNELS_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def is_admin(update):
+def is_admin(update: Update) -> bool:
     if not ADMIN_IDS:
         return True
     return update.effective_user.id in ADMIN_IDS
@@ -39,29 +39,29 @@ def build_main_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
-    update.message.reply_text(
+    await update.message.reply_text(
         "👋 Добро пожаловать в панель управления News Aggregator!\nВыберите действие:",
         reply_markup=build_main_menu()
     )
 
-def main_menu_callback(update: Update, context: CallbackContext):
+async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
     query = update.callback_query
-    query.answer()
-    query.edit_message_text(
+    await query.answer()
+    await query.edit_message_text(
         "👋 Добро пожаловать в панель управления News Aggregator!\nВыберите действие:",
         reply_markup=build_main_menu()
     )
 
-def list_channels_callback(update: Update, context: CallbackContext):
+async def list_channels_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     try:
         data = load_channels()
@@ -74,33 +74,32 @@ def list_channels_callback(update: Update, context: CallbackContext):
         keyboard = [[InlineKeyboardButton("◀️ Назад в меню", callback_data="main_menu")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Telegram message length limit is 4096. We split if it exceeds.
         if len(text) > 4000:
             for i in range(0, len(text), 4000):
                 if i + 4000 >= len(text):
-                    query.message.reply_html(text[i:i+4000], reply_markup=reply_markup)
+                    await query.message.reply_html(text[i:i+4000], reply_markup=reply_markup)
                 else:
-                    query.message.reply_html(text[i:i+4000])
+                    await query.message.reply_html(text[i:i+4000])
         else:
-            query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
+            await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e:
-        query.edit_message_text(f"Ошибка: {e}")
+        await query.edit_message_text(f"Ошибка: {e}")
 
-def add_channel_start(update: Update, context: CallbackContext):
+async def add_channel_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return ConversationHandler.END
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     keyboard = [[InlineKeyboardButton("❌ Отмена", callback_data="cancel_action")]]
-    query.edit_message_text(
+    await query.edit_message_text(
         "Введите системное имя канала (например: <code>rian_ru</code>):", 
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return AWAIT_CHANNEL_NAME
 
-def add_channel_name_received(update: Update, context: CallbackContext):
+async def add_channel_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['new_channel_name'] = update.message.text.strip()
     
     keyboard = [
@@ -109,44 +108,43 @@ def add_channel_name_received(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🟣 purple (Разное/Поп)", callback_data="group_purple")],
         [InlineKeyboardButton("❌ Отмена", callback_data="cancel_action")]
     ]
-    update.message.reply_text(
+    await update.message.reply_text(
         f"Отлично. Теперь выберите группу (эмодзи-окрас) для канала <b>{context.user_data['new_channel_name']}</b>:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return AWAIT_GROUP_NAME
 
-def add_channel_group_received(update: Update, context: CallbackContext):
+async def add_channel_group_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     group = query.data.replace("group_", "")
     context.user_data['new_channel_group'] = group
     
     keyboard = [[InlineKeyboardButton("Пропустить (оставить как системное)", callback_data="skip_alias")]]
-    query.edit_message_text(
+    await query.edit_message_text(
         f"Группа <b>{group}</b> выбрана.\nВведите человекочитаемое название (алиас) канала, которое будет отображаться в постах:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return AWAIT_ALIAS_NAME
 
-def add_channel_alias_received(update: Update, context: CallbackContext):
+async def add_channel_alias_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     alias = update.message.text.strip()
-    return finish_add_channel(update.message, context, alias)
+    return await finish_add_channel(update.message, context, alias)
 
-def add_channel_skip_alias(update: Update, context: CallbackContext):
+async def add_channel_skip_alias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     alias = context.user_data['new_channel_name']
-    return finish_add_channel(query.message, context, alias, from_query=True)
+    return await finish_add_channel(query.message, context, alias, from_query=True)
 
-def finish_add_channel(message, context: CallbackContext, alias: str, from_query=False):
+async def finish_add_channel(message, context: ContextTypes.DEFAULT_TYPE, alias: str, from_query=False):
     name = context.user_data['new_channel_name']
     group = context.user_data['new_channel_group']
     
     try:
         data = load_channels()
-        # Check uniqueness
         if any(ch["name"] == name for ch in data["channels"]):
              text = f"Канал <b>{name}</b> уже существует!"
         else:
@@ -164,26 +162,24 @@ def finish_add_channel(message, context: CallbackContext, alias: str, from_query
             
         keyboard = [[InlineKeyboardButton("◀️ В главное меню", callback_data="main_menu")]]
         if from_query:
-            message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            await message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            await message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
-        message.reply_text(f"Ошибка сохранения: {e}")
+        await message.reply_text(f"Ошибка сохранения: {e}")
 
     return ConversationHandler.END
 
 
-def remove_channel_start(update: Update, context: CallbackContext):
+async def remove_channel_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         return
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     data = load_channels()
     keyboard = []
     
-    # Due to limits, we show max 50 recent channels, or add a pagination. 
-    # For simplicity, we list the last 50 added. 
     channels_to_show = data["channels"][-50:]
     
     for ch in channels_to_show:
@@ -191,14 +187,14 @@ def remove_channel_start(update: Update, context: CallbackContext):
         
     keyboard.append([InlineKeyboardButton("◀️ Назад в меню", callback_data="main_menu")])
     
-    query.edit_message_text(
+    await query.edit_message_text(
         "Выберите канал для удаления (показаны последние 50):",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-def remove_channel_confirm(update: Update, context: CallbackContext):
+async def remove_channel_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     channel_name = query.data.replace("remove_", "")
     
     try:
@@ -210,16 +206,16 @@ def remove_channel_confirm(update: Update, context: CallbackContext):
         
         if len(data["channels"]) < initial_len:
             save_channels(data)
-            query.edit_message_text(f"✅ Канал <code>{channel_name}</code> успешно удален!", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(f"✅ Канал <code>{channel_name}</code> успешно удален!", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            query.edit_message_text(f"Канал <code>{channel_name}</code> не найден.", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(f"Канал <code>{channel_name}</code> не найден.", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
-        query.edit_message_text(f"Ошибка: {e}")
+        await query.edit_message_text(f"Ошибка: {e}")
 
-def cancel_action(update: Update, context: CallbackContext):
+async def cancel_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
-    query.edit_message_text(
+    await query.answer()
+    await query.edit_message_text(
         "Действие отменено.\nВыберите команду:",
         reply_markup=build_main_menu()
     )
@@ -232,32 +228,30 @@ def main():
         print("Set ADMIN_BOT_TOKEN env variable.")
         return
         
-    updater = Updater(token)
-    dispatcher = updater.dispatcher
+    app = ApplicationBuilder().token(token).build()
     
     conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(add_channel_start, pattern='^add_channel$')],
         states={
-            AWAIT_CHANNEL_NAME: [MessageHandler(Filters.text & ~Filters.command, add_channel_name_received)],
+            AWAIT_CHANNEL_NAME: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, add_channel_name_received)],
             AWAIT_GROUP_NAME: [CallbackQueryHandler(add_channel_group_received, pattern='^group_')],
             AWAIT_ALIAS_NAME: [
-                MessageHandler(Filters.text & ~Filters.command, add_channel_alias_received),
+                MessageHandler(Filters.TEXT & ~Filters.COMMAND, add_channel_alias_received),
                 CallbackQueryHandler(add_channel_skip_alias, pattern='^skip_alias$')
             ],
         },
         fallbacks=[CallbackQueryHandler(cancel_action, pattern='^cancel_action$')]
     )
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CallbackQueryHandler(main_menu_callback, pattern='^main_menu$'))
-    dispatcher.add_handler(CallbackQueryHandler(list_channels_callback, pattern='^list_channels$'))
-    dispatcher.add_handler(CallbackQueryHandler(remove_channel_start, pattern='^remove_channel_list$'))
-    dispatcher.add_handler(CallbackQueryHandler(remove_channel_confirm, pattern='^remove_'))
-    dispatcher.add_handler(conv_handler)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(main_menu_callback, pattern='^main_menu$'))
+    app.add_handler(CallbackQueryHandler(list_channels_callback, pattern='^list_channels$'))
+    app.add_handler(CallbackQueryHandler(remove_channel_start, pattern='^remove_channel_list$'))
+    app.add_handler(CallbackQueryHandler(remove_channel_confirm, pattern='^remove_'))
+    app.add_handler(conv_handler)
     
-    print("Interactive Admin bot started.")
-    updater.start_polling()
-    updater.idle()
+    print("Interactive Admin bot started (v20+ async support).")
+    app.run_polling()
 
 if __name__ == '__main__':
     main()
