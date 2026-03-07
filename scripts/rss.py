@@ -33,7 +33,7 @@ def add_cluster(feed, cluster, renderer, issue_name):
     text = renderer.render_cluster(cluster, issue_name)
     text = text.replace("\n", "</br>")
     entry.description(text)
-    entry.link(href=cluster.get_url("https://t.me/nyannews", "main"))
+    entry.link(href=cluster.get_url("https://t.me/POSLESVO77", "main"))
     entry.published(ts_to_dt(cluster.create_time))
     if cluster.images:
         photo = cluster.images[0]
