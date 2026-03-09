@@ -40,10 +40,14 @@ def openai_completion(
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+        default_headers={
+            "HTTP-Referer": "https://github.com/IlyaGusev/nyan",
+            "X-Title": "Nyan",
+        }
     )
 
-    max_retries = 5
-    retry_delay = 30  # seconds, doubles each retry
+    max_retries = 3
+    retry_delay = 10
 
     while True:
         try:
@@ -55,13 +59,13 @@ def openai_completion(
             max_retries -= 1
             if max_retries <= 0:
                 logging.error("Rate limit: max retries exceeded, giving up.")
-                raise e
+                return ""
             logging.warning(
-                "Rate limit (429). Waiting %ds before retry (%d left)...",
-                retry_delay, max_retries,
+                "Rate limit (429). Waiting %ds before retry (%d left)... Error: %s",
+                retry_delay, max_retries, getattr(e, 'message', str(e))
             )
             time.sleep(retry_delay)
-            retry_delay *= 2
+            retry_delay = min(retry_delay * 2, 60)
         except Exception as e:
             logging.warning("OpenAI error: %s.", e)
             if "Please reduce" in str(e):
@@ -87,11 +91,14 @@ def openai_batch_completion(
     sleep_time: int = 2,
 ) -> List[str]:
     completions = []
-    with ThreadPool(len(batch)) as pool:
-        results = pool.starmap(
-            openai_completion,
-            [(messages, decoding_args, model_name, sleep_time) for messages in batch],
+    for messages in batch:
+        result = openai_completion(
+            messages=messages, 
+            decoding_args=decoding_args, 
+            model_name=model_name, 
+            sleep_time=sleep_time
         )
-        for result in results:
-            completions.append(result)
+        completions.append(result)
+        time.sleep(sleep_time)
+        
     return completions
