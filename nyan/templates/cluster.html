@@ -7,6 +7,8 @@
 {% endif %}
 <i>Новости группируются автоматически. Сообщение не достоверно. Правдивость информации не проверяется. Секция с подробностями составлена языковой моделью.</i>
 
+<blockquote expandable>Цитата приведена в объеме, необходимом для информационного обзора. Права на оригинальный материал принадлежат соответствующему правообладателю.</blockquote>
+
 👁️{{views}}
 {% for group, sources in groups %}
 {{-emojis[group]-}}{%- for source in sources %}<a href="{{source.url}}">{{source.channel_title}}</a>{% if not loop.last %} • {% endif %}{% endfor %}

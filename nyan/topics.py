@@ -41,12 +41,12 @@ def extract_topics(
         titles = topic["titles"]
         final_titles = []
         for r in titles:
-            link = "[{}]({})".format(r["verb"], r["url"])
+            link = '<a href="{}">{}</a>'.format(r["url"], r["verb"])
             fixed_title = r["title"].replace(" " + r["verb"], " " + link, 1)
             if fixed_title == r["title"]:
                 fixed_title = r["title"].replace(r["verb"], link, 1)
             if fixed_title == r["title"]:
-                link = "[{}]({})".format(r["verb"].capitalize(), r["url"])
+                link = '<a href="{}">{}</a>'.format(r["url"], r["verb"].capitalize())
                 fixed_title = fixed_title.replace(r["verb"].capitalize(), link, 1)
             final_titles.append(fixed_title)
         topic["titles"] = final_titles
@@ -105,9 +105,19 @@ def main(
         model_name=model_name,
     )
 
+    end_dt = ts_to_dt(get_current_ts())
+    start_dt = ts_to_dt(get_current_ts() - duration)
+    start_dt_str = start_dt.strftime("%d.%m.%Y, %H:%M")
+    end_dt_str = end_dt.strftime("%d.%m.%Y, %H:%M")
+
     with open(template_path, "r") as f:
         template = Template(f.read())
-    text = template.render(topics=topics, duration_hours=int(duration_hours))
+    text = template.render(
+        topics=topics,
+        duration_hours=int(duration_hours),
+        start_dt=start_dt_str,
+        end_dt=end_dt_str
+    )
     print(text)
 
     should_publish = False
@@ -116,8 +126,8 @@ def main(
 
     if auto or should_publish:
         client = TelegramClient(client_config_path)
-        client.send_message(text, issue_name=issue_name, parse_mode="Markdown")
-        client.send_message(text, issue_name="summary", parse_mode="Markdown")
+        client.send_message(text, issue_name=issue_name, parse_mode="html")
+        client.send_message(text, issue_name="summary", parse_mode="html")
 
     collection = get_topics_collection(mongo_config_path)
     record = {"clusters": fixed_clusters, "topics": topics}

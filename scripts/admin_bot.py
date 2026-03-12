@@ -232,7 +232,7 @@ async def cb_channels_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
-async def cb_channel_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def cb_channel_list(update: Update, context: ContextTypes.DEFAULT_TYPE, force_page: Optional[int] = None) -> None:
     """Show paginated list of channels."""
     if not is_admin(update):
         return
@@ -240,7 +240,10 @@ async def cb_channel_list(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     assert query is not None
     await query.answer()
 
-    page = int(query.data.split(":")[1])  # type: ignore[union-attr]
+    if force_page is not None:
+        page = force_page
+    else:
+        page = int(query.data.split(":")[1])  # type: ignore[union-attr]
 
     try:
         data = load_channels()
@@ -338,8 +341,7 @@ async def cb_channel_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await query.answer("Канал не найден", show_alert=True)
 
         # Refresh the list
-        query.data = f"ch_list:{page}"  # type: ignore[assignment]
-        await cb_channel_list(update, context)
+        await cb_channel_list(update, context, force_page=page)
     except Exception as e:
         await query.edit_message_text(
             f"❌ Ошибка: {e}", reply_markup=back_button("channels_menu")

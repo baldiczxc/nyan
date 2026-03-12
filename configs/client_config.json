@@ -2,39 +2,39 @@
     "issues": [
         {
             "name": "main",
-            "channel_id": -1002327662766,
-            "discussion_id": -1,
+            "channel_id": -1003848903722,
+            "discussion_id": -3879844076,
             "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         },
         {
             "name": "tech",
-            "channel_id": -1002327662766,
-            "discussion_id": -1,
+            "channel_id": -1003372990620,
+            "discussion_id": -3187602139,
             "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         },
         {
             "name": "economy",
-            "channel_id": -1002327662766,
-            "discussion_id": -1,
+            "channel_id": -1003715581413,
+            "discussion_id": -3710062634,
             "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         },
         {
             "name": "moscow",
-            "channel_id": -1002327662766,
-            "discussion_id": -1,
+            "channel_id": -1003830027663,
+            "discussion_id": -3798441845,
             "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         },
         {
             "name": "svo",
-            "channel_id": -1,
-            "discussion_id": -1,
-            "bot_token": "PLACEHOLDER_SVO_BOT_TOKEN"
+            "channel_id": -1003785541707,
+            "discussion_id": -3851861523,
+            "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         },
         {
             "name": "protivnik",
-            "channel_id": -1,
-            "discussion_id": -1,
-            "bot_token": "PLACEHOLDER_PROTIVNIK_BOT_TOKEN"
+            "channel_id": -1003733699611,
+            "discussion_id": -3866633383,
+            "bot_token": "8785400748:AAHylzfnfAaclikD_t8qcdvO6jj8V7KhiKU"
         }
     ]
 }

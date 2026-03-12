@@ -221,6 +221,26 @@ class Daemon:
             min_size_ratio=self.config["similar_min_size_ratio"],
             min_intersection_ratio=self.config["similar_min_intersection_ratio"],
         )
+        
+        # Fallback: check cosmetic embedding similarity if exact URL intersection failed
+        if not posted_cluster and cluster.embedding:
+            current_ts = get_current_ts()
+            historical_clusters = posted_clusters.get_embedded_clusters(current_ts, issue_name)
+            if historical_clusters:
+                pivot_embedding = [cluster.embedding]
+                historical_embeddings = [cl.embedding for cl in historical_clusters]
+                sims = cosine_similarity(pivot_embedding, historical_embeddings)[0]
+                
+                max_index = sims.argmax()
+                max_sim = sims[max_index]
+                if max_sim >= 0.90:
+                    best_cluster = historical_clusters[max_index]
+                    posted_cluster = best_cluster
+                    print(
+                        f"Found similar by embedding (sim={max_sim:.3f}): "
+                        f"'{cluster.cropped_title}' -> '{best_cluster.cropped_title}'"
+                    )
+
         if posted_cluster:
             message = posted_cluster.get_issue_message(issue_name)
             assert message
