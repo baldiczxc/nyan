@@ -129,3 +129,5 @@ dmypy.json
 .pyre/
 Чек-лист на 02.03.26.md
 /mongo
+models/lid.176.bin
+models/multilingual_e5_base_cat_detect.joblib

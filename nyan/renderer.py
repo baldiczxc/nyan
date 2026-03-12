@@ -1,11 +1,10 @@
 import copy
 import os
 import json
+import time
 from urllib.parse import urlsplit
 from collections import defaultdict
-
 from jinja2 import Environment, FileSystemLoader
-
 from nyan.clusters import Cluster
 from nyan.channels import Channels
 from nyan.document import Document
@@ -17,14 +16,17 @@ class Renderer:
         assert os.path.exists(config_path)
         with open(config_path) as r:
             config = json.load(r)
-
         self.channels = channels
-
         file_loader = FileSystemLoader(".")
         env = Environment(loader=file_loader)
         self.cluster_template = env.get_template(config["cluster_template"])
         self.tz_offset = config["tz_offset"]
         self.tz_name = config["tz_name"]
+
+    def _get_diff(self, cluster: Cluster) -> list:
+        if "diff" not in cluster.__dict__:
+            time.sleep(5)
+        return cluster.diff
 
     def render_cluster(self, cluster: Cluster, issue_name: str) -> str:
         groups = defaultdict(list)
@@ -38,7 +40,6 @@ class Renderer:
                 emojis[group] = channel.emojis[issue_name]
             if channel.colors:
                 colors[group] = channel.colors[issue_name]
-
         used_channels = set()
         for group_name, group_docs in groups.items():
             group_docs.sort(key=lambda x: x.pub_time)
@@ -49,22 +50,19 @@ class Renderer:
                 used_channels.add(doc.channel_id)
                 filtered_group.append(doc)
             groups[group_name] = filtered_group
-
         sorted_groups = sorted(groups.items(), key=lambda x: x[0])
         first_doc = copy.deepcopy(cluster.first_doc)
         first_doc.pub_time_dt = ts_to_dt(first_doc.pub_time, self.tz_offset)
-
         external_link = None
         if cluster.external_links:
             external_link_url, el_cnt = cluster.external_links.most_common()[0]
             external_link_host = urlsplit(external_link_url).netloc
             if el_cnt >= 2:
                 external_link = {"url": external_link_url, "host": external_link_host}
-
         views = self.views_to_str(cluster.views)
         return self.cluster_template.render(
             annotation_doc=cluster.annotation_doc,
-            diff=cluster.diff,
+            diff=self._get_diff(cluster),
             first_doc=first_doc,
             groups=sorted_groups,
             emojis=emojis,

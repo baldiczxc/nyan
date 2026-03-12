@@ -103,8 +103,12 @@ class Daemon:
         print("{} clusters in all issues after filtering".format(num_clusters))
 
         print()
+        is_first_cluster = True
         for issue, clusters in ranked_clusters.items():
             for cluster in clusters:
+                if not is_first_cluster:
+                    sleep(10)
+                is_first_cluster = False
                 self.send_cluster(
                     cluster,
                     issue,

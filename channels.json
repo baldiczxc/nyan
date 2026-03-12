@@ -289,7 +289,7 @@
       },
       "alias": "SOTA",
       "master": "sotaproject",
-      "disabled": true,
+      "disabled": false,
       "issue": "main"
     },
     {
@@ -1178,7 +1178,7 @@
       "groups": {
         "main": "purple"
       },
-      "disabled": true
+      "disabled": false
     },
     {
       "name": "aifonline",
@@ -1324,8 +1324,8 @@
       "alias": "Москва Life",
       "issue": "moscow",
       "groups": {
-         "moscow": "moscow",
-         "main": "red"
+        "moscow": "moscow",
+        "main": "red"
       }
     },
     {
@@ -1513,6 +1513,53 @@
         "economy": "economy"
       },
       "recrawl_time": 300
+    },
+    {
+      "name": "gggg",
+      "groups": {
+        "main": "purple",
+        "tech": "tech"
+      },
+      "alias": "gggg",
+      "issue": "main",
+      "disabled": true
+    },
+    {
+      "name": "ццацйа",
+      "groups": {
+        "main": "purple",
+        "tech": "tech"
+      },
+      "alias": "цццц",
+      "issue": "main",
+      "disabled": true
+    },
+    {
+      "name": "сво77",
+      "groups": {
+        "main": "purple",
+        "tech": "tech"
+      },
+      "alias": "сво7777",
+      "issue": "main",
+      "disabled": true
+    },
+    {
+      "name": "test",
+      "alias": "test",
+      "issue": "main",
+      "groups": {
+        "main": "purple"
+      },
+      "disabled": true
+    },
+    {
+      "name": "asupersharij",
+      "alias": "Шарий",
+      "issue": "main",
+      "groups": {
+        "main": "purple"
+      }
     }
   ],
   "emojis": {
@@ -1520,10 +1567,12 @@
     "blue": "🌎",
     "purple": "⚖️",
     "tech": "💻",
-    "economy":"💰",
+    "economy": "💰",
     "other": "📰",
     "moscow": "🌆",
-    "entertainment": "🎭"
+    "entertainment": "🎭",
+    "svo": "🎖",
+    "protivnik": "⚔️"
   },
   "colors": {
     "red": "🟥",
@@ -1533,13 +1582,17 @@
     "economy": "🟨",
     "other": "⬜",
     "moscow": "⬜",
-    "entertainment": "🟩"
+    "entertainment": "🟩",
+    "svo": "🟧",
+    "protivnik": "🟫"
   },
   "default_groups": {
     "main": "purple",
     "tech": "other",
     "economy": "other",
     "moscow": "other",
-    "entertainment": "other"
+    "entertainment": "other",
+    "svo": "other",
+    "protivnik": "other"
   }
 }

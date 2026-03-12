@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import random
 import traceback
 import shutil
 import hashlib
@@ -20,6 +22,26 @@ from nyan.openai import openai_completion
 
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 T = TypeVar("T")
+
+
+def openai_completion_with_retry(
+    messages: List[Dict[str, Any]],
+    model_name: str,
+    max_retries: int = 5,
+) -> Optional[str]:
+    for attempt in range(max_retries):
+        try:
+            return openai_completion(messages=messages, model_name=model_name)
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "rate limit" in err.lower() or "too many requests" in err.lower():
+                wait = (2 ** attempt) + random.uniform(0, 1)
+                print(f"[diff] Rate limited (429), retrying in {wait:.1f}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                raise
+    print(f"[diff] Exhausted {max_retries} retries, giving up")
+    return None
 
 
 class Cluster:
@@ -145,7 +167,7 @@ class Cluster:
             return self.saved_first_doc
         return min(self.docs, key=lambda x: x.pub_time)
 
-    @property
+    @cached_property
     def diff(self) -> List[Dict[str, Any]]:
         if self.saved_diff is not None:
             return self.saved_diff
@@ -158,8 +180,12 @@ class Cluster:
 
         differences: List[Dict[str, Any]] = []
         try:
-            content = openai_completion(messages=messages, model_name="openai/gpt-oss-120b:free")
+            content = openai_completion_with_retry(messages=messages, model_name="stepfun/step-3.5-flash:free")
+            if not content:
+                return differences
             content = content[content.find("{") : content.rfind("}") + 1]
+            if not content:
+                return differences
             parsed_content: Dict[str, List[Dict[str, Any]]] = json.loads(content)
             differences = parsed_content["differences"]
 
@@ -301,7 +327,12 @@ class Cluster:
         if first_doc_dict:
             cluster.saved_first_doc = Document.fromdict(first_doc_dict)
         cluster.saved_hash = d.get("hash")
-        cluster.saved_diff = d.get("diff", None)
+
+        # Pre-populate cached_property so no API call is made for already-computed diffs
+        saved_diff = d.get("diff", None)
+        if saved_diff is not None:
+            cluster.__dict__["diff"] = saved_diff
+
         cluster.is_important = d.get("is_important", False)
         cluster.create_time = d.get("create_time", None)
 
@@ -441,6 +472,11 @@ class Clusters:
         for clid, cluster in sorted(self.clid2cluster.items()):
             if only_new and max_cluster_fetch_time - cluster.fetch_time > 24 * 3600:
                 continue
+            # Compute diff before saving; if it's a new call (not cached), throttle
+            diff_already_cached = "diff" in cluster.__dict__
+            _ = cluster.diff
+            if not diff_already_cached:
+                time.sleep(5)
             saved_count += 1
             collection.replace_one({"clid": clid}, cluster.asdict(), upsert=True)
         return saved_count

@@ -136,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--template-path", type=str, default="nyan/templates/topics.html"
     )
-    parser.add_argument("--model-name", type=str, default="openai/gpt-oss-120b:free")
+    parser.add_argument("--model-name", type=str, default="stepfun/step-3.5-flash:free")
     parser.add_argument("--auto", default=False, action="store_true")
     args = parser.parse_args()
     main(**vars(args))

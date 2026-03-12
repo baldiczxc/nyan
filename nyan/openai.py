@@ -12,6 +12,22 @@ import re
 
 load_dotenv()
 
+_client = None
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+            max_retries=0,
+            default_headers={
+                "HTTP-Referer": "https://github.com/IlyaGusev/nyan",
+                "X-Title": "Nyan",
+            }
+        )
+    return _client
+
 
 @dataclass
 class OpenAIDecodingArguments:
@@ -31,23 +47,16 @@ DEFAULT_ARGS = OpenAIDecodingArguments()
 def openai_completion(
     messages: List[Dict[str, Any]],
     decoding_args: OpenAIDecodingArguments = DEFAULT_ARGS,
-    model_name: str = "openai/gpt-oss-120b:free",
+    model_name: str = "stepfun/step-3.5-flash:free",
     sleep_time: int = 2,
 ) -> str:
     decoding_args = copy.deepcopy(decoding_args)
     assert decoding_args.n == 1
 
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.environ.get("OPENROUTER_API_KEY", ""),
-        default_headers={
-            "HTTP-Referer": "https://github.com/IlyaGusev/nyan",
-            "X-Title": "Nyan",
-        }
-    )
+    client = _get_client()
 
     max_retries = 3
-    retry_delay = 10
+    retry_delay = 30
 
     while True:
         try:
@@ -57,15 +66,23 @@ def openai_completion(
             break
         except RateLimitError as e:
             max_retries -= 1
+            # Debug: dump full error details
+            response = getattr(e, 'response', None)
+            if response is not None:
+                logging.warning("Response status: %s", response.status_code)
+                logging.warning("Response headers: %s", dict(response.headers))
+                logging.warning("Response body: %s", response.text)
+            else:
+                logging.warning("No response object on error: %s", repr(e))
             if max_retries <= 0:
                 logging.error("Rate limit: max retries exceeded, giving up.")
                 return ""
             logging.warning(
-                "Rate limit (429). Waiting %ds before retry (%d left)... Error: %s",
-                retry_delay, max_retries, getattr(e, 'message', str(e))
+                "Rate limit (429). Waiting %ds before retry (%d left)...",
+                retry_delay, max_retries,
             )
             time.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2, 60)
+            retry_delay = min(retry_delay * 2, 120)
         except Exception as e:
             logging.warning("OpenAI error: %s.", e)
             if "Please reduce" in str(e):
@@ -87,7 +104,7 @@ def openai_completion(
 def openai_batch_completion(
     batch: List[List[Dict[str, Any]]],
     decoding_args: OpenAIDecodingArguments = DEFAULT_ARGS,
-    model_name: str = "openai/gpt-oss-120b:free",
+    model_name: str = "stepfun/step-3.5-flash:free",
     sleep_time: int = 2,
 ) -> List[str]:
     completions = []
@@ -99,6 +116,6 @@ def openai_batch_completion(
             sleep_time=sleep_time
         )
         completions.append(result)
-        time.sleep(sleep_time)
+        time.sleep(max(sleep_time, 5))
         
     return completions

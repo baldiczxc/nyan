@@ -155,7 +155,10 @@ class TelegramClient:
             response = self._edit_caption(message_id, text, issue=issue)
         print("Update status code:", response.status_code)
         if response.status_code != 200:
-            print("Update error:", response.text)
+            if response.status_code == 400 and "message is not modified" in response.text:
+                print("Update skipped: message content unchanged")
+            else:
+                print("Update error:", response.text)
 
     def update_discussion_mapping(self, issue_name: str) -> None:
         if issue_name not in self.issues:

@@ -34,6 +34,14 @@ from telegram.ext import (
     MessageHandler,
     filters as Filters,
 )
+from telegram.warnings import PTBUserWarning
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    category=PTBUserWarning,
+    message="If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message."
+)
 
 # ─────────────────────────── Config ───────────────────────────
 
@@ -48,9 +56,11 @@ CHANNELS_PER_PAGE = 20
 (
     AWAIT_CHANNEL_NAME,
     AWAIT_GROUP_NAME,
+    AWAIT_EXTRA_GROUPS,
+    AWAIT_ISSUE,
     AWAIT_ALIAS_NAME,
     AWAIT_SEARCH_QUERY,
-) = range(4)
+) = range(6)
 
 # ─────────────────────────── Helpers ──────────────────────────
 
@@ -533,13 +543,112 @@ async def add_channel_group_received(update: Update, context: ContextTypes.DEFAU
     await query.answer()
     group = query.data.replace("group_", "")  # type: ignore[union-attr]
     context.user_data["new_channel_group"] = group
+    context.user_data["new_channel_extra"] = set()  # extra groups: economy, tech, entertainment
+
+    return await _show_extra_groups(query, context)
+
+
+def _build_extra_groups_keyboard(selected: set) -> InlineKeyboardMarkup:
+    """Build toggle keyboard for extra topic groups."""
+    labels = {
+        "economy": "📈 Экономика",
+        "tech": "💻 Технологии",
+        "entertainment": "🎭 Развлечения",
+        "svo": "🎖 СВО",
+        "protivnik": "⚔️ Противник",
+    }
+    keyboard = []
+    for key, label in labels.items():
+        mark = "✅" if key in selected else "☐"
+        keyboard.append([
+            InlineKeyboardButton(f"{mark} {label}", callback_data=f"extra_{key}")
+        ])
+    keyboard.append([InlineKeyboardButton("➡️ Далее", callback_data="extra_done")])
+    keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data="cancel_conv")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def _show_extra_groups(query: Any, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Show/refresh the extra groups toggle screen."""
+    assert context.user_data is not None
+    selected = context.user_data["new_channel_extra"]
+    group = context.user_data["new_channel_group"]
+    sel_text = ", ".join(sorted(selected)) if selected else "нет"
+    await query.edit_message_text(
+        f"Основная группа: <b>{group}</b>\n"
+        f"Доп. группы: <b>{sel_text}</b>\n\n"
+        "Выберите дополнительные тематические группы:",
+        parse_mode="HTML",
+        reply_markup=_build_extra_groups_keyboard(selected),
+    )
+    return AWAIT_EXTRA_GROUPS
+
+
+async def add_channel_extra_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Toggle an extra group on/off."""
+    query = update.callback_query
+    assert query is not None
+    assert context.user_data is not None
+    await query.answer()
+    key = query.data.replace("extra_", "")  # type: ignore[union-attr]
+    selected: set = context.user_data["new_channel_extra"]
+    if key in selected:
+        selected.discard(key)
+    else:
+        selected.add(key)
+    return await _show_extra_groups(query, context)
+
+
+async def add_channel_extra_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Extra groups selected, proceed to issue selection."""
+    query = update.callback_query
+    assert query is not None
+    assert context.user_data is not None
+    await query.answer()
+
+    # Determine available issues based on selected groups
+    keyboard = [
+        [InlineKeyboardButton("📰 main", callback_data="issue_main")],
+    ]
+    extra = context.user_data["new_channel_extra"]
+    if "tech" in extra:
+        keyboard.append([InlineKeyboardButton("💻 tech", callback_data="issue_tech")])
+    if "economy" in extra:
+        keyboard.append([InlineKeyboardButton("📈 economy", callback_data="issue_economy")])
+    if "svo" in extra:
+        keyboard.append([InlineKeyboardButton("🎖 svo", callback_data="issue_svo")])
+    if "protivnik" in extra:
+        keyboard.append([InlineKeyboardButton("⚔️ protivnik", callback_data="issue_protivnik")])
+    keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data="cancel_conv")])
+
+    group = context.user_data["new_channel_group"]
+    sel = context.user_data["new_channel_extra"]
+    sel_text = ", ".join(sorted(sel)) if sel else "нет"
+    await query.edit_message_text(
+        f"Основная группа: <b>{group}</b>\n"
+        f"Доп. группы: <b>{sel_text}</b>\n\n"
+        "Выберите основной выпуск (issue) канала:",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return AWAIT_ISSUE
+
+
+async def add_channel_issue_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Issue selected, proceed to alias."""
+    query = update.callback_query
+    assert query is not None
+    assert context.user_data is not None
+    await query.answer()
+    issue = query.data.replace("issue_", "")  # type: ignore[union-attr]
+    context.user_data["new_channel_issue"] = issue
 
     keyboard = [
         [InlineKeyboardButton("⏩ Пропустить (= системное имя)", callback_data="skip_alias")],
         [InlineKeyboardButton("❌ Отмена", callback_data="cancel_conv")],
     ]
     await query.edit_message_text(
-        f"Группа <b>{group}</b> выбрана.\n"
+        f"Issue: <b>{issue}</b>\n"
         "Введите алиас (человекочитаемое название) канала:",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -571,22 +680,33 @@ async def _finish_add_channel(
     assert context.user_data is not None
     name = context.user_data["new_channel_name"]
     group = context.user_data["new_channel_group"]
+    extra: set = context.user_data.get("new_channel_extra", set())
+    issue = context.user_data.get("new_channel_issue", "main")
 
     try:
         data = load_channels()
         if any(ch["name"] == name for ch in data["channels"]):
             text = f"⚠️ Канал <code>{name}</code> уже существует!"
         else:
-            data["channels"].append({
+            # Build groups dict like the original template
+            groups: Dict[str, str] = {"main": group}
+            for ex in sorted(extra):
+                groups[ex] = ex
+
+            channel_entry: Dict[str, Any] = {
                 "name": name,
-                "groups": {"main": group, "tech": "tech" if group == "purple" else "other"},
                 "alias": alias,
-                "issue": "main",
-            })
+                "issue": issue,
+                "groups": groups,
+            }
+            data["channels"].append(channel_entry)
             save_channels(data)
+
+            groups_str = ", ".join(f"{k}={v}" for k, v in groups.items())
             text = (
-                f"✅ Канал <b>{alias}</b> (<code>{name}</code>) "
-                f"добавлен в группу <b>{group}</b>!"
+                f"✅ Канал <b>{alias}</b> (<code>{name}</code>)\n"
+                f"Issue: <b>{issue}</b>\n"
+                f"Groups: <code>{groups_str}</code>"
             )
 
         kb = back_button("channels_menu")
@@ -847,6 +967,13 @@ def main() -> None:
             ],
             AWAIT_GROUP_NAME: [
                 CallbackQueryHandler(add_channel_group_received, pattern=r"^group_"),
+            ],
+            AWAIT_EXTRA_GROUPS: [
+                CallbackQueryHandler(add_channel_extra_toggle, pattern=r"^extra_(economy|tech|entertainment|svo|protivnik)$"),
+                CallbackQueryHandler(add_channel_extra_done, pattern=r"^extra_done$"),
+            ],
+            AWAIT_ISSUE: [
+                CallbackQueryHandler(add_channel_issue_received, pattern=r"^issue_"),
             ],
             AWAIT_ALIAS_NAME: [
                 MessageHandler(Filters.TEXT & ~Filters.COMMAND, add_channel_alias_received),
