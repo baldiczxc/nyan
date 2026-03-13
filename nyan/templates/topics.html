@@ -1,10 +1,10 @@
-<b>Выжимка за {{duration_hours}} часов:</b>
+<b>Сводка новостей за {{duration_hours}} часов:</b>
 {% for topic in topics %}
 {{topic.emojis}} <b>{{topic.name}}</b>
 {%- for title in topic["titles"] %}
 - {{title}}{% endfor %}
 {% endfor %}
-Канал с выжимками: <a href="https://t.me/nyannews_summary">@nyannews_summary</a>
+Канал с сводками: <a href="https://t.me/nyannews_summary">@nyannews_summary</a>
 
 <i>Сделано автоматически с помощью OpenAI GPT-4o. Сообщение совсем не достоверно. Правдивость информации не проверяется.</i>
 

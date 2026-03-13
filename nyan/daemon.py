@@ -279,6 +279,10 @@ class Daemon:
             print()
             return
 
+        if cluster.views < 100000:
+            print("Skipping new cluster in {}: not enough views ({} < 100000): {}".format(issue_name, cluster.views, cluster.cropped_title))
+            return
+
         cluster_text = self.renderer.render_cluster(cluster, issue_name)
         print("New cluster in {}: {}".format(issue_name, cluster.cropped_title))
 
