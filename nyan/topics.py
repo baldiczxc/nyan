@@ -1,7 +1,7 @@
 import argparse
 import json
 from typing import List, Dict, Any
-
+import time
 from jinja2 import Template
 
 from nyan.clusters import Clusters
@@ -25,18 +25,40 @@ def extract_topics(
     print(prompt)
 
     messages = [{"role": "user", "content": prompt}]
-    content = openai_completion(messages=messages, model_name=model_name)
-    print(content)
+    
+    max_retries = 3
+    topics = []
+    
+    for attempt in range(1, max_retries + 1):
+        print(f"\n--- LLM Request Attempt {attempt}/{max_retries} ---")
+        content = openai_completion(messages=messages, model_name=model_name)
+        print(content)
 
-    start = content.find("{")
-    end = content.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        raise ValueError(f"Model returned no valid JSON. Raw response:\n{content}")
-    content = content[start : end + 1]
-    try:
-        topics: List[Dict[str, Any]] = json.loads(content)["topics"]
-    except (json.JSONDecodeError, KeyError) as e:
-        raise ValueError(f"Failed to parse model response as JSON: {e}\nExtracted content:\n{content}")
+        start = content.find("{")
+        end = content.rfind("}")
+        
+        # Проверяем, есть ли вообще скобки JSON
+        if start == -1 or end == -1 or end < start:
+            print(f"Attempt {attempt} failed: Model returned no valid JSON markers.")
+            if attempt == max_retries:
+                raise ValueError(f"Model returned no valid JSON after {max_retries} attempts. Raw response:\n{content}")
+            time.sleep(3) # Ждем 3 секунды перед следующей попыткой
+            continue
+            
+        json_content = content[start : end + 1]
+        
+        # Пробуем распарсить JSON
+        try:
+            topics = json.loads(json_content)["topics"]
+            print("Successfully parsed JSON!")
+            break # Успех! Выходим из цикла ретраев
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Attempt {attempt} failed: JSON parse error: {e}")
+            if attempt == max_retries:
+                raise ValueError(f"Failed to parse model response as JSON after {max_retries} attempts: {e}\nExtracted content:\n{json_content}")
+            time.sleep(3) # Ждем перед повтором
+
+    # Форматируем ссылки в заголовках (оригинальная логика)
     for topic in topics:
         titles = topic["titles"]
         final_titles = []
@@ -50,6 +72,7 @@ def extract_topics(
                 fixed_title = fixed_title.replace(r["verb"].capitalize(), link, 1)
             final_titles.append(fixed_title)
         topic["titles"] = final_titles
+        
     return topics
 
 
